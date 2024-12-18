@@ -87,7 +87,7 @@
           video.srcObject = stream;
           video.style.display = "block";
           captureBtn.style.display = "block";
-          flashlightBtn.style.display = "block";  // Show flashlight button
+          flashlightBtn.style.display = "block";  // Show flashlight button after camera starts
           canvas.style.display = "none";
         })
         .catch((err) => console.error("Camera access error:", err));
@@ -95,11 +95,12 @@
 
     // Event: Capture Image from Camera
     captureBtn.addEventListener("click", () => {
+      // Draw the current frame from the video to the canvas
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       processImage(); // Process the captured image
       video.style.display = "none";
       captureBtn.style.display = "none";
-      canvas.style.display = "block";
+      canvas.style.display = "block";  // Make the canvas visible again after capture
     });
 
     // Toggle Flashlight
