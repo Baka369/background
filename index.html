@@ -1,130 +1,177 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dot Detector</title>
-    <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
-    <style>
-        #canvas {
-            display: block;
-            margin: 20px auto;
-            border: 1px solid black;
-        }
-        .button-container {
-            text-align: center;
-            margin-top: 20px;
-        }
-        #webcam {
-            width: 100%;
-            max-width: 600px;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <title>Dot Counter</title>
+  <script async src="https://docs.opencv.org/4.5.2/opencv.js"></script>
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      background-color: #f4f4f4;
+    }
+    canvas, video {
+      border: 1px solid black;
+      margin-top: 10px;
+    }
+    button, input {
+      margin: 10px;
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    #result {
+      font-size: 20px;
+      margin-top: 10px;
+    }
+  </style>
 </head>
 <body>
-    <h1 style="text-align: center;">Dot Detector</h1>
+  <h1>Dot Counter</h1>
 
-    <div class="button-container">
-        <button onclick="uploadImage()">Upload Image</button>
-        <button onclick="startWebcam()">Start Webcam</button>
-    </div>
+  <!-- Buttons and File Input -->
+  <input type="file" id="imageUpload" accept="image/*" style="display:none;">
+  <button id="uploadBtn">Upload Image</button>
+  <button id="cameraBtn">Click Picture</button>
+  <button id="flashlightBtn" style="display:none;">Toggle Flashlight</button>
 
-    <div id="upload-section" style="text-align: center; display: none;">
-        <input type="file" id="uploadInput" onchange="processImage()" accept="image/*" />
-    </div>
+  <!-- Video and Canvas Elements -->
+  <video id="video" autoplay playsinline style="display:none;"></video>
+  <canvas id="canvas" width="640" height="480"></canvas>
+  <button id="captureBtn" style="display:none;">Capture</button>
+  <p id="result">Dots Counted: 0</p>
 
-    <video id="webcam" autoplay></video>
-    <canvas id="canvas" width="600" height="400"></canvas>
+  <script>
+    const uploadBtn = document.getElementById("uploadBtn");
+    const cameraBtn = document.getElementById("cameraBtn");
+    const imageUpload = document.getElementById("imageUpload");
+    const video = document.getElementById("video");
+    const canvas = document.getElementById("canvas");
+    const captureBtn = document.getElementById("captureBtn");
+    const flashlightBtn = document.getElementById("flashlightBtn");
+    const ctx = canvas.getContext("2d");
+    const resultText = document.getElementById("result");
+    let flashlightOn = false;
+    let stream;
 
-    <script>
-        let net = null;
-        let videoElement = document.getElementById('webcam');
-        let canvas = document.getElementById('canvas');
-        let context = canvas.getContext('2d');
-        let uploadInput = document.getElementById('uploadInput');
+    // Event: Upload Image
+    uploadBtn.addEventListener("click", () => imageUpload.click());
 
-        // OpenCV.js setup
-        function onOpenCvReady() {
-            console.log('OpenCV.js is ready.');
-        }
+    imageUpload.addEventListener("change", (event) => {
+      const file = event.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onload = () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            processImage();
+          };
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
+    });
 
-        // Upload image functionality
-        function uploadImage() {
-            document.getElementById('upload-section').style.display = 'block';
-        }
+    // Event: Open Camera
+    cameraBtn.addEventListener("click", () => {
+      navigator.mediaDevices
+        .getUserMedia({ video: { facingMode: "environment" } })
+        .then((str) => {
+          stream = str;
+          video.srcObject = stream;
+          video.style.display = "block";
+          captureBtn.style.display = "block";
+          flashlightBtn.style.display = "block";  // Show flashlight button
+          canvas.style.display = "none";
+        })
+        .catch((err) => console.error("Camera access error:", err));
+    });
 
-        function processImage() {
-            let file = uploadInput.files[0];
-            let reader = new FileReader();
-            reader.onload = function(e) {
-                let img = new Image();
-                img.onload = function() {
-                    context.clearRect(0, 0, canvas.width, canvas.height);
-                    context.drawImage(img, 0, 0, canvas.width, canvas.height);
-                    countDots(canvas);
-                };
-                img.src = e.target.result;
-            };
-            reader.readAsDataURL(file);
-        }
+    // Event: Capture Image from Camera
+    captureBtn.addEventListener("click", () => {
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      processImage(); // Process the captured image
+      video.style.display = "none";
+      captureBtn.style.display = "none";
+      canvas.style.display = "block";
+    });
 
-        // Count dots in the canvas (processed image)
-        function countDots(canvas) {
-            let mat = cv.imread(canvas);
-            cv.cvtColor(mat, mat, cv.COLOR_RGBA2GRAY, 0);
+    // Toggle Flashlight
+    flashlightBtn.addEventListener("click", () => {
+      if (flashlightOn) {
+        turnOffFlashlight();
+      } else {
+        turnOnFlashlight();
+      }
+      flashlightOn = !flashlightOn;
+    });
 
-            // Threshold the image to binary
-            cv.threshold(mat, mat, 100, 255, cv.THRESH_BINARY | cv.THRESH_OTSU);
+    // Turn on flashlight
+    function turnOnFlashlight() {
+      const track = stream.getVideoTracks()[0];
+      const constraints = track.getCapabilities();
+      if (constraints.torch) {
+        track.applyConstraints({ advanced: [{ torch: true }] })
+          .then(() => console.log("Flashlight turned on"))
+          .catch((err) => console.error("Flashlight error:", err));
+      }
+    }
 
-            // Find contours
-            let contours = new cv.MatVector();
-            let hierarchy = new cv.Mat();
-            cv.findContours(mat, contours, hierarchy, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
+    // Turn off flashlight
+    function turnOffFlashlight() {
+      const track = stream.getVideoTracks()[0];
+      const constraints = track.getCapabilities();
+      if (constraints.torch) {
+        track.applyConstraints({ advanced: [{ torch: false }] })
+          .then(() => console.log("Flashlight turned off"))
+          .catch((err) => console.error("Flashlight error:", err));
+      }
+    }
 
-            // Filter by area and count dots
-            let s1 = 3, s2 = 20;
-            let dotCount = 0;
-            for (let i = 0; i < contours.size(); i++) {
-                let cnt = contours.get(i);
-                if (cv.contourArea(cnt) > s1 && cv.contourArea(cnt) < s2) {
-                    dotCount++;
-                }
-            }
+    // Process Image and Count Dots
+    function processImage() {
+      const src = cv.imread(canvas);
 
-            console.log('Dots detected: ' + dotCount);
-            alert('Dots detected: ' + dotCount);
+      // Convert to Grayscale
+      const gray = new cv.Mat();
+      cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
 
-            mat.delete();
-            contours.delete();
-            hierarchy.delete();
-        }
+      // Debug: Display Grayscale Image
+      cv.imshow(canvas, gray);
 
-        // Start webcam functionality
-        function startWebcam() {
-            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-                navigator.mediaDevices.getUserMedia({ video: true })
-                    .then(function(stream) {
-                        videoElement.srcObject = stream;
-                        videoElement.onloadedmetadata = function() {
-                            videoElement.play();
-                        };
-                    })
-                    .catch(function(err) {
-                        console.log('Error accessing webcam: ' + err);
-                    });
-            } else {
-                alert('Webcam not supported in your browser');
-            }
-        }
+      // Apply Gaussian Blur to Reduce Noise
+      cv.GaussianBlur(gray, gray, { width: 5, height: 5 }, 0);
 
-        // Capture image from webcam
-        function captureImage() {
-            context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
-            countDots(canvas);
-        }
+      // Apply Binary Threshold
+      const binary = new cv.Mat();
+      cv.threshold(gray, binary, 150, 255, cv.THRESH_BINARY_INV);
 
-        // Set interval to capture image every 2 seconds
-        setInterval(captureImage, 2000);
-    </script>
+      // Debug: Display Binary Image
+      cv.imshow(canvas, binary);
+
+      // Find Contours
+      const contours = new cv.MatVector();
+      const hierarchy = new cv.Mat();
+      cv.findContours(binary, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+
+      // Count and Display Dots
+      const dotCount = contours.size();
+      console.log("Contours detected:", dotCount);
+      resultText.innerText = `Dots Counted: ${dotCount}`;
+
+      // Clean up
+      src.delete();
+      gray.delete();
+      binary.delete();
+      contours.delete();
+      hierarchy.delete();
+    }
+  </script>
 </body>
 </html>
