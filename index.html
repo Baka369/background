@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dot Counter (Image Upload)</title>
+  <title>Dot Counter (Upload or Capture)</title>
   <script async src="https://docs.opencv.org/4.5.2/opencv.js"></script>
   <style>
     body {
@@ -15,11 +15,11 @@
       margin: 0;
       background-color: #f4f4f4;
     }
-    canvas, img {
+    canvas, video {
       border: 1px solid black;
       margin-top: 10px;
     }
-    button {
+    button, input {
       margin: 10px;
       padding: 10px 20px;
       font-size: 16px;
@@ -32,65 +32,90 @@
   </style>
 </head>
 <body>
-  <h1>Dot Counter (Image Upload)</h1>
-  
-  <!-- Image Upload Section -->
-  <input type="file" id="fileInput" accept="image/*">
-  
-  <!-- Canvas for displaying uploaded image -->
+  <h1>Dot Counter</h1>
+
+  <!-- Buttons and File Input -->
+  <input type="file" id="imageUpload" accept="image/*" style="display:none;">
+  <button id="uploadBtn">Upload Image</button>
+  <button id="cameraBtn">Click Picture</button>
+
+  <!-- Video and Canvas Elements -->
+  <video id="video" autoplay playsinline style="display:none;"></video>
   <canvas id="canvas" width="640" height="480"></canvas>
+  <button id="captureBtn" style="display:none;">Capture</button>
   <p id="result">Dots Counted: 0</p>
 
   <script>
-    const fileInput = document.getElementById("fileInput");
+    const uploadBtn = document.getElementById("uploadBtn");
+    const cameraBtn = document.getElementById("cameraBtn");
+    const imageUpload = document.getElementById("imageUpload");
+    const video = document.getElementById("video");
     const canvas = document.getElementById("canvas");
+    const captureBtn = document.getElementById("captureBtn");
     const ctx = canvas.getContext("2d");
     const resultText = document.getElementById("result");
 
-    // Event: Image Upload
-    fileInput.addEventListener("change", (event) => {
+    // Event: Upload Image
+    uploadBtn.addEventListener("click", () => imageUpload.click());
+
+    imageUpload.addEventListener("change", (event) => {
       const file = event.target.files[0];
       if (file) {
-        const img = new Image();
-        img.onload = function() {
-          // Draw the uploaded image onto the canvas
-          canvas.width = img.width;
-          canvas.height = img.height;
-          ctx.drawImage(img, 0, 0);
-
-          // Process the image to detect dots
-          countDots();
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onload = () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            processImage();
+          };
+          img.src = e.target.result;
         };
-        img.src = URL.createObjectURL(file);
+        reader.readAsDataURL(file);
       }
     });
 
-    // Function to count dots in the image
-    function countDots() {
-      // Get image data from canvas
-      let src = cv.imread(canvas);
-      let gray = new cv.Mat();
-      let binary = new cv.Mat();
-      
-      // Convert image to grayscale
-      cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
-      
-      // Apply binary threshold to highlight dots (dark areas on light background)
-      cv.threshold(gray, binary, 200, 255, cv.THRESH_BINARY_INV);
+    // Event: Open Camera
+    cameraBtn.addEventListener("click", () => {
+      navigator.mediaDevices
+        .getUserMedia({ video: { facingMode: "environment" } })
+        .then((stream) => {
+          video.srcObject = stream;
+          video.style.display = "block";
+          captureBtn.style.display = "block";
+          canvas.style.display = "none";
+        })
+        .catch((err) => console.error("Camera access error:", err));
+    });
 
-      // Find contours of potential dots
-      let contours = new cv.MatVector();
-      let hierarchy = new cv.Mat();
-      cv.findContours(binary, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
-      
-      // Count the number of contours (dots)
+    // Event: Capture Image from Camera
+    captureBtn.addEventListener("click", () => {
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      processImage();
+      video.style.display = "none";
+      captureBtn.style.display = "none";
+      canvas.style.display = "block";
+    });
+
+    // Process Image and Count Dots
+    function processImage() {
+      const src = cv.imread(canvas);
+      const gray = new cv.Mat();
+      cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
+
+      // Set a threshold to deal with black background
+      cv.threshold(gray, gray, 100, 255, cv.THRESH_BINARY_INV);
+
+      const contours = new cv.MatVector();
+      const hierarchy = new cv.Mat();
+      cv.findContours(gray, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+
       const dotCount = contours.size();
       resultText.innerText = `Dots Counted: ${dotCount}`;
 
-      // Clean up OpenCV Mats
+      // Clean up
       src.delete();
       gray.delete();
-      binary.delete();
       contours.delete();
       hierarchy.delete();
     }
