@@ -103,21 +103,21 @@
       const gray = new cv.Mat();
       cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
 
-      // Set a threshold to deal with black background
+      // Threshold to convert the image to black-and-white (binarization)
       cv.threshold(gray, gray, 100, 255, cv.THRESH_BINARY_INV);
 
-      const contours = new cv.MatVector();
-      const hierarchy = new cv.Mat();
-      cv.findContours(gray, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+      // Use Hough Circle Transform to detect circular dots
+      const circles = new cv.Mat();
+      cv.HoughCircles(gray, circles, cv.HOUGH_GRADIENT, 1, gray.rows / 8, 100, 30, 0, 50); 
 
-      const dotCount = contours.size();
+      // Count the circles (dots)
+      const dotCount = circles.cols;
       resultText.innerText = `Dots Counted: ${dotCount}`;
 
       // Clean up
       src.delete();
       gray.delete();
-      contours.delete();
-      hierarchy.delete();
+      circles.delete();
     }
   </script>
 </body>
