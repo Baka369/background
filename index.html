@@ -1,157 +1,140 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Dot Counter with Shadow Removal</title>
-  <script async src="https://docs.opencv.org/4.5.2/opencv.js"></script>
-  <style>
-    body {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      margin: 0;
-      background-color: #f4f4f4;
-    }
-    canvas, video {
-      border: 1px solid black;
-      margin-top: 10px;
-    }
-    button, input {
-      margin: 10px;
-      padding: 10px 20px;
-      font-size: 16px;
-      cursor: pointer;
-    }
-    #result {
-      font-size: 20px;
-      margin-top: 10px;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dot Detector</title>
+    <script async src="https://docs.opencv.org/master/opencv.js"></script>
+    <style>
+        #outputCanvas {
+            border: 1px solid black;
+            margin-top: 10px;
+        }
+        #webcamCanvas {
+            display: none;
+        }
+    </style>
 </head>
 <body>
-  <h1>Dot Counter with Shadow Removal</h1>
+    <h2>Dot Detector</h2>
 
-  <!-- Buttons and File Input -->
-  <input type="file" id="imageUpload" accept="image/*" style="display:none;">
-  <button id="uploadBtn">Upload Image</button>
-  <button id="cameraBtn">Click Picture</button>
+    <!-- Upload Photo Section -->
+    <input type="file" id="fileInput" accept="image/*">
+    <button onclick="uploadImage()">Upload Image</button>
 
-  <!-- Video and Canvas Elements -->
-  <video id="video" autoplay playsinline style="display:none;"></video>
-  <canvas id="canvas" width="640" height="480"></canvas>
-  <button id="captureBtn" style="display:none;">Capture</button>
-  <p id="result">Dots Counted: 0</p>
+    <br><br>
 
-  <script>
-    const uploadBtn = document.getElementById("uploadBtn");
-    const cameraBtn = document.getElementById("cameraBtn");
-    const imageUpload = document.getElementById("imageUpload");
-    const video = document.getElementById("video");
-    const canvas = document.getElementById("canvas");
-    const captureBtn = document.getElementById("captureBtn");
-    const ctx = canvas.getContext("2d");
-    const resultText = document.getElementById("result");
+    <!-- Webcam Section -->
+    <button onclick="startWebcam()">Click Photo with Webcam</button>
+    <video id="video" width="320" height="240" autoplay></video>
+    <canvas id="webcamCanvas"></canvas>
 
-    let videoStream;
+    <br><br>
 
-    // Initialize background subtractor for shadow removal
-    const bg = new cv.BackgroundSubtractorMOG2();
-    bg.set("nmixtures", 3);
-    bg.set("bShadowDetection", true);
+    <!-- Results -->
+    <h3 id="resultText">Dots Counted: 0</h3>
 
-    // Event: Upload Image
-    uploadBtn.addEventListener("click", () => imageUpload.click());
+    <!-- Output Canvas for Detected Dots -->
+    <canvas id="outputCanvas" width="320" height="240"></canvas>
 
-    imageUpload.addEventListener("change", (event) => {
-      const file = event.target.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const img = new Image();
-          img.onload = () => {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            processImage();
-          };
-          img.src = e.target.result;
+    <script>
+        // Wait until OpenCV.js is loaded
+        cv.onRuntimeInitialized = () => {
+            console.log("OpenCV.js is ready.");
         };
-        reader.readAsDataURL(file);
-      }
-    });
 
-    // Event: Open Camera
-    cameraBtn.addEventListener("click", () => {
-      navigator.mediaDevices
-        .getUserMedia({ video: { facingMode: "environment" } })
-        .then((stream) => {
-          video.srcObject = stream;
-          video.style.display = "block";
-          captureBtn.style.display = "block";
-          canvas.style.display = "none";
-          videoStream = stream;
-        })
-        .catch((err) => console.error("Camera access error:", err));
-    });
+        // Global variables
+        let imgElement = null;
+        let webcamVideo = document.getElementById("video");
+        let webcamCanvas = document.getElementById("webcamCanvas");
+        let outputCanvas = document.getElementById("outputCanvas");
+        let resultText = document.getElementById("resultText");
 
-    // Event: Capture Image from Camera
-    captureBtn.addEventListener("click", () => {
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      processImage(); // Process the captured image
-      video.style.display = "none";
-      captureBtn.style.display = "none";
-      canvas.style.display = "block";
+        // Function to upload an image
+        function uploadImage() {
+            let input = document.getElementById("fileInput");
+            let file = input.files[0];
 
-      // Stop the video stream after capture
-      if (videoStream) {
-        videoStream.getTracks().forEach(track => track.stop());
-      }
-    });
+            if (file) {
+                let reader = new FileReader();
+                reader.onload = function (e) {
+                    let img = new Image();
+                    img.onload = function () {
+                        // Draw the image to the canvas
+                        let canvas = outputCanvas;
+                        let ctx = canvas.getContext("2d");
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                        processImage(canvas);
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        }
 
-    // Process Image and Count Dots
-    function processImage() {
-      const src = cv.imread(canvas);
+        // Function to start the webcam and capture photo
+        function startWebcam() {
+            // Get user media (webcam)
+            navigator.mediaDevices.getUserMedia({ video: true })
+                .then(function (stream) {
+                    webcamVideo.srcObject = stream;
+                    webcamVideo.play();
+                }).catch(function (error) {
+                    console.error("Error accessing webcam: ", error);
+                });
 
-      // Convert to Grayscale
-      const gray = new cv.Mat();
-      cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
+            // Capture image from webcam
+            setTimeout(function () {
+                let ctx = webcamCanvas.getContext("2d");
+                ctx.drawImage(webcamVideo, 0, 0, webcamCanvas.width, webcamCanvas.height);
+                processImage(webcamCanvas);
+            }, 1000); // Capture after 1 second
+        }
 
-      // Apply Background Subtraction (Shadow Removal)
-      const fore = new cv.Mat();
-      bg.apply(gray, fore);
+        // Function to process the image and count dots
+        function processImage(canvas) {
+            let src = cv.imread(canvas);
+            let gray = new cv.Mat();
+            cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
 
-      // Erode and Dilate to remove noise and fill small gaps
-      cv.erode(fore, fore, new cv.Mat());
-      cv.dilate(fore, fore, new cv.Mat());
+            // Thresholding
+            let threshed = new cv.Mat();
+            cv.threshold(gray, threshed, 100, 255, cv.THRESH_BINARY | cv.THRESH_OTSU);
 
-      // Threshold the image to get a binary image
-      const binary = new cv.Mat();
-      cv.threshold(fore, binary, 127, 255, cv.THRESH_BINARY);
+            // Find contours
+            let contours = new cv.MatVector();
+            let hierarchy = new cv.Mat();
+            cv.findContours(threshed, contours, hierarchy, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
 
-      // Find contours
-      const contours = new cv.MatVector();
-      const hierarchy = new cv.Mat();
-      cv.findContours(binary, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+            // Filter contours by area
+            let s1 = 3, s2 = 20;
+            let xcnts = [];
+            for (let i = 0; i < contours.size(); i++) {
+                let cnt = contours.get(i);
+                let area = cv.contourArea(cnt);
+                if (area > s1 && area < s2) {
+                    xcnts.push(cnt);
+                }
+            }
 
-      // Draw contours on the frame
-      cv.drawContours(src, contours, -1, new cv.Scalar(0, 0, 255), 2);
+            // Update the result text
+            resultText.innerText = `Dots Counted: ${xcnts.length}`;
 
-      // Count the number of contours (dots)
-      const dotCount = contours.size();
-      resultText.innerText = `Dots Counted: ${dotCount}`;
+            // Draw contours on the output canvas
+            let ctx = outputCanvas.getContext("2d");
+            ctx.clearRect(0, 0, outputCanvas.width, outputCanvas.height);
+            ctx.drawImage(canvas, 0, 0, outputCanvas.width, outputCanvas.height);
+            cv.drawContours(src, contours, -1, new cv.Scalar(0, 255, 0), 2);
+            cv.imshow(outputCanvas, src);
 
-      // Debug: Display the final image on canvas
-      cv.imshow(canvas, src);
-
-      // Clean up memory
-      src.delete();
-      gray.delete();
-      fore.delete();
-      binary.delete();
-      contours.delete();
-      hierarchy.delete();
-    }
-  </script>
+            // Cleanup
+            src.delete();
+            gray.delete();
+            threshed.delete();
+            contours.delete();
+            hierarchy.delete();
+        }
+    </script>
 </body>
 </html>
