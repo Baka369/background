@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dot Detector</title>
+  <title>Dot Counter (Image Upload)</title>
   <script async src="https://docs.opencv.org/4.5.2/opencv.js"></script>
   <style>
     body {
@@ -15,7 +15,7 @@
       margin: 0;
       background-color: #f4f4f4;
     }
-    canvas, video {
+    canvas, img {
       border: 1px solid black;
       margin-top: 10px;
     }
@@ -32,60 +32,42 @@
   </style>
 </head>
 <body>
-  <h1>Dot Counter (Real-time Detection)</h1>
+  <h1>Dot Counter (Image Upload)</h1>
   
-  <!-- Buttons and Video Elements -->
-  <button id="cameraBtn">Start Camera</button>
-  <button id="stopBtn" style="display:none;">Stop Camera</button>
+  <!-- Image Upload Section -->
+  <input type="file" id="fileInput" accept="image/*">
   
-  <!-- Video and Canvas Elements -->
-  <video id="video" autoplay playsinline style="display:none;"></video>
+  <!-- Canvas for displaying uploaded image -->
   <canvas id="canvas" width="640" height="480"></canvas>
   <p id="result">Dots Counted: 0</p>
 
   <script>
-    const cameraBtn = document.getElementById("cameraBtn");
-    const stopBtn = document.getElementById("stopBtn");
-    const video = document.getElementById("video");
+    const fileInput = document.getElementById("fileInput");
     const canvas = document.getElementById("canvas");
     const ctx = canvas.getContext("2d");
     const resultText = document.getElementById("result");
-    let streaming = false;
-    let videoStream = null;
 
-    // Event: Start Camera
-    cameraBtn.addEventListener("click", () => {
-      navigator.mediaDevices
-        .getUserMedia({ video: { facingMode: "environment" } })
-        .then((stream) => {
-          video.srcObject = stream;
-          video.style.display = "block";
-          stopBtn.style.display = "block";
-          cameraBtn.style.display = "none";
-          videoStream = stream;
-          streaming = true;
-          processFrame(); // Start processing frames
-        })
-        .catch((err) => console.error("Camera access error:", err));
+    // Event: Image Upload
+    fileInput.addEventListener("change", (event) => {
+      const file = event.target.files[0];
+      if (file) {
+        const img = new Image();
+        img.onload = function() {
+          // Draw the uploaded image onto the canvas
+          canvas.width = img.width;
+          canvas.height = img.height;
+          ctx.drawImage(img, 0, 0);
+
+          // Process the image to detect dots
+          countDots();
+        };
+        img.src = URL.createObjectURL(file);
+      }
     });
 
-    // Event: Stop Camera
-    stopBtn.addEventListener("click", () => {
-      videoStream.getTracks().forEach(track => track.stop());
-      video.style.display = "none";
-      stopBtn.style.display = "none";
-      cameraBtn.style.display = "block";
-      streaming = false;
-    });
-
-    // Process the video frame for dots detection
-    function processFrame() {
-      if (!streaming) return;
-
-      // Draw the current video frame on the canvas
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-      // Convert the canvas image to a format suitable for OpenCV
+    // Function to count dots in the image
+    function countDots() {
+      // Get image data from canvas
       let src = cv.imread(canvas);
       let gray = new cv.Mat();
       let binary = new cv.Mat();
@@ -93,7 +75,7 @@
       // Convert image to grayscale
       cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
       
-      // Apply a binary threshold to highlight dots
+      // Apply binary threshold to highlight dots (dark areas on light background)
       cv.threshold(gray, binary, 200, 255, cv.THRESH_BINARY_INV);
 
       // Find contours of potential dots
@@ -111,9 +93,6 @@
       binary.delete();
       contours.delete();
       hierarchy.delete();
-
-      // Request the next frame
-      requestAnimationFrame(processFrame);
     }
   </script>
 </body>
