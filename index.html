@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Dot Counter</title>
+  <script async src="https://docs.opencv.org/4.5.2/opencv.js"></script>
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      background-color: #f4f4f4;
+    }
+    canvas, video {
+      border: 1px solid black;
+      margin-top: 10px;
+    }
+    button, input {
+      margin: 10px;
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    #result {
+      font-size: 20px;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Dot Counter</h1>
+
+  <!-- Buttons and File Input -->
+  <input type="file" id="imageUpload" accept="image/*" style="display:none;">
+  <button id="uploadBtn">Upload Image</button>
+  <button id="cameraBtn">Click Picture</button>
+
+  <!-- Video and Canvas Elements -->
+  <video id="video" autoplay playsinline style="display:none;"></video>
+  <canvas id="canvas" width="640" height="480"></canvas>
+  <button id="captureBtn" style="display:none;">Capture</button>
+  <p id="result">Dots Counted: 0</p>
+
+  <script>
+    const uploadBtn = document.getElementById("uploadBtn");
+    const cameraBtn = document.getElementById("cameraBtn");
+    const imageUpload = document.getElementById("imageUpload");
+    const video = document.getElementById("video");
+    const canvas = document.getElementById("canvas");
+    const captureBtn = document.getElementById("captureBtn");
+    const ctx = canvas.getContext("2d");
+    const resultText = document.getElementById("result");
+
+    // Event: Upload Image
+    uploadBtn.addEventListener("click", () => imageUpload.click());
+
+    imageUpload.addEventListener("change", (event) => {
+      const file = event.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onload = () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            processImage();
+          };
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    // Event: Open Camera
+    cameraBtn.addEventListener("click", () => {
+      navigator.mediaDevices
+        .getUserMedia({ video: { facingMode: "environment" } })
+        .then((stream) => {
+          video.srcObject = stream;
+          video.style.display = "block";
+          captureBtn.style.display = "block";
+          canvas.style.display = "none";
+        })
+        .catch((err) => console.error("Camera access error:", err));
+    });
+
+    // Event: Capture Image from Camera
+    captureBtn.addEventListener("click", () => {
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      processImage(); // Process the captured image
+      video.style.display = "none";
+      captureBtn.style.display = "none";
+      canvas.style.display = "block";
+    });
+
+    // Process Image and Count Dots
+    function processImage() {
+      const src = cv.imread(canvas);
+
+      // Convert to Grayscale
+      const gray = new cv.Mat();
+      cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
+
+      // Apply Gaussian Blur to Reduce Noise
+      cv.GaussianBlur(gray, gray, { width: 5, height: 5 }, 0);
+
+      // Adaptive Thresholding to Handle Shadows
+      const binary = new cv.Mat();
+      cv.adaptiveThreshold(
+        gray,
+        binary,
+        255,
+        cv.ADAPTIVE_THRESH_GAUSSIAN_C,
+        cv.THRESH_BINARY_INV,
+        11,
+        2
+      );
+
+      // Morphological Operations to Clean Up Noise
+      const kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE, new cv.Size(3, 3));
+      cv.morphologyEx(binary, binary, cv.MORPH_CLOSE, kernel);
+
+      // Debug: Display Binary Image
+      cv.imshow(canvas, binary);
+
+      // Find Contours
+      const contours = new cv.MatVector();
+      const hierarchy = new cv.Mat();
+      cv.findContours(binary, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+
+      // Count and Display Dots
+      const dotCount = contours.size();
+      console.log("Contours detected:", dotCount);
+      resultText.innerText = `Dots Counted: ${dotCount}`;
+
+      // Clean up
+      src.delete();
+      gray.delete();
+      binary.delete();
+      contours.delete();
+      hierarchy.delete();
+      kernel.delete();
+    }
+  </script>
+</body>
+</html>
