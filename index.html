@@ -54,6 +54,8 @@
     const ctx = canvas.getContext("2d");
     const resultText = document.getElementById("result");
 
+    let videoStream;
+
     // Initialize background subtractor for shadow removal
     const bg = new cv.BackgroundSubtractorMOG2();
     bg.set("nmixtures", 3);
@@ -88,6 +90,7 @@
           video.style.display = "block";
           captureBtn.style.display = "block";
           canvas.style.display = "none";
+          videoStream = stream;
         })
         .catch((err) => console.error("Camera access error:", err));
     });
@@ -99,6 +102,11 @@
       video.style.display = "none";
       captureBtn.style.display = "none";
       canvas.style.display = "block";
+
+      // Stop the video stream after capture
+      if (videoStream) {
+        videoStream.getTracks().forEach(track => track.stop());
+      }
     });
 
     // Process Image and Count Dots
