@@ -2,8 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dot Counter (Upload or Capture)</title>
+  <title>Dot Counter with Shadow Removal</title>
   <script async src="https://docs.opencv.org/4.5.2/opencv.js"></script>
   <style>
     body {
@@ -32,7 +31,7 @@
   </style>
 </head>
 <body>
-  <h1>Dot Counter</h1>
+  <h1>Dot Counter with Shadow Removal</h1>
 
   <!-- Buttons and File Input -->
   <input type="file" id="imageUpload" accept="image/*" style="display:none;">
@@ -54,6 +53,11 @@
     const captureBtn = document.getElementById("captureBtn");
     const ctx = canvas.getContext("2d");
     const resultText = document.getElementById("result");
+
+    // Initialize background subtractor for shadow removal
+    const bg = new cv.BackgroundSubtractorMOG2();
+    bg.set("nmixtures", 3);
+    bg.set("bShadowDetection", true);
 
     // Event: Upload Image
     uploadBtn.addEventListener("click", () => imageUpload.click());
@@ -91,7 +95,7 @@
     // Event: Capture Image from Camera
     captureBtn.addEventListener("click", () => {
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      processImage();
+      processImage(); // Process the captured image
       video.style.display = "none";
       captureBtn.style.display = "none";
       canvas.style.display = "block";
@@ -100,24 +104,45 @@
     // Process Image and Count Dots
     function processImage() {
       const src = cv.imread(canvas);
+
+      // Convert to Grayscale
       const gray = new cv.Mat();
       cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
 
-      // Threshold to convert the image to black-and-white (binarization)
-      cv.threshold(gray, gray, 100, 255, cv.THRESH_BINARY_INV);
+      // Apply Background Subtraction (Shadow Removal)
+      const fore = new cv.Mat();
+      bg.apply(gray, fore);
 
-      // Use Hough Circle Transform to detect circular dots
-      const circles = new cv.Mat();
-      cv.HoughCircles(gray, circles, cv.HOUGH_GRADIENT, 1, gray.rows / 8, 100, 30, 0, 50); 
+      // Erode and Dilate to remove noise and fill small gaps
+      cv.erode(fore, fore, new cv.Mat());
+      cv.dilate(fore, fore, new cv.Mat());
 
-      // Count the circles (dots)
-      const dotCount = circles.cols;
+      // Threshold the image to get a binary image
+      const binary = new cv.Mat();
+      cv.threshold(fore, binary, 127, 255, cv.THRESH_BINARY);
+
+      // Find contours
+      const contours = new cv.MatVector();
+      const hierarchy = new cv.Mat();
+      cv.findContours(binary, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+
+      // Draw contours on the frame
+      cv.drawContours(src, contours, -1, new cv.Scalar(0, 0, 255), 2);
+
+      // Count the number of contours (dots)
+      const dotCount = contours.size();
       resultText.innerText = `Dots Counted: ${dotCount}`;
 
-      // Clean up
+      // Debug: Display the final image on canvas
+      cv.imshow(canvas, src);
+
+      // Clean up memory
       src.delete();
       gray.delete();
-      circles.delete();
+      fore.delete();
+      binary.delete();
+      contours.delete();
+      hierarchy.delete();
     }
   </script>
 </body>
