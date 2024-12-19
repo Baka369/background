@@ -37,7 +37,6 @@
   <input type="file" id="imageUpload" accept="image/*" style="display:none;">
   <button id="uploadBtn">Upload Image</button>
   <button id="cameraBtn">Click Picture</button>
-  <button id="flashlightBtn" style="display:none;">Toggle Flashlight</button>
 
   <!-- Video and Canvas Elements -->
   <video id="video" autoplay playsinline style="display:none;"></video>
@@ -52,11 +51,8 @@
     const video = document.getElementById("video");
     const canvas = document.getElementById("canvas");
     const captureBtn = document.getElementById("captureBtn");
-    const flashlightBtn = document.getElementById("flashlightBtn");
     const ctx = canvas.getContext("2d");
     const resultText = document.getElementById("result");
-    let flashlightOn = false;
-    let stream;
 
     // Event: Upload Image
     uploadBtn.addEventListener("click", () => imageUpload.click());
@@ -82,12 +78,10 @@
     cameraBtn.addEventListener("click", () => {
       navigator.mediaDevices
         .getUserMedia({ video: { facingMode: "environment" } })
-        .then((str) => {
-          stream = str;
+        .then((stream) => {
           video.srcObject = stream;
           video.style.display = "block";
           captureBtn.style.display = "block";
-          flashlightBtn.style.display = "block";  // Show flashlight button after camera starts
           canvas.style.display = "none";
         })
         .catch((err) => console.error("Camera access error:", err));
@@ -95,45 +89,12 @@
 
     // Event: Capture Image from Camera
     captureBtn.addEventListener("click", () => {
-      // Draw the current frame from the video to the canvas
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       processImage(); // Process the captured image
       video.style.display = "none";
       captureBtn.style.display = "none";
-      canvas.style.display = "block";  // Make the canvas visible again after capture
+      canvas.style.display = "block";
     });
-
-    // Toggle Flashlight
-    flashlightBtn.addEventListener("click", () => {
-      if (flashlightOn) {
-        turnOffFlashlight();
-      } else {
-        turnOnFlashlight();
-      }
-      flashlightOn = !flashlightOn;
-    });
-
-    // Turn on flashlight
-    function turnOnFlashlight() {
-      const track = stream.getVideoTracks()[0];
-      const constraints = track.getCapabilities();
-      if (constraints.torch) {
-        track.applyConstraints({ advanced: [{ torch: true }] })
-          .then(() => console.log("Flashlight turned on"))
-          .catch((err) => console.error("Flashlight error:", err));
-      }
-    }
-
-    // Turn off flashlight
-    function turnOffFlashlight() {
-      const track = stream.getVideoTracks()[0];
-      const constraints = track.getCapabilities();
-      if (constraints.torch) {
-        track.applyConstraints({ advanced: [{ torch: false }] })
-          .then(() => console.log("Flashlight turned off"))
-          .catch((err) => console.error("Flashlight error:", err));
-      }
-    }
 
     // Process Image and Count Dots
     function processImage() {
@@ -143,15 +104,20 @@
       const gray = new cv.Mat();
       cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
 
-      // Debug: Display Grayscale Image
-      cv.imshow(canvas, gray);
-
       // Apply Gaussian Blur to Reduce Noise
       cv.GaussianBlur(gray, gray, { width: 5, height: 5 }, 0);
 
-      // Apply Binary Threshold
+      // Apply Adaptive Thresholding
       const binary = new cv.Mat();
-      cv.threshold(gray, binary, 150, 255, cv.THRESH_BINARY_INV);
+      cv.adaptiveThreshold(
+        gray,
+        binary,
+        255,
+        cv.ADAPTIVE_THRESH_GAUSSIAN_C,
+        cv.THRESH_BINARY_INV,
+        11,
+        2
+      );
 
       // Debug: Display Binary Image
       cv.imshow(canvas, binary);
