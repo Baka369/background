@@ -109,7 +109,7 @@
 
       // Apply Weighted Adaptive Thresholding
       const binary = new cv.Mat();
-      const blockSize = 13; // Size of pixel neighborhood
+      const blockSize = 15; // Size of pixel neighborhood
       const weightedC = 5;  // Weighted constant subtracted from mean
       cv.adaptiveThreshold(
         gray,
