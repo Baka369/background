@@ -107,16 +107,18 @@
       // Apply Gaussian Blur to Reduce Noise
       cv.GaussianBlur(gray, gray, { width: 5, height: 5 }, 0);
 
-      // Apply Adaptive Thresholding
+      // Apply Weighted Adaptive Thresholding
       const binary = new cv.Mat();
+      const blockSize = 11; // Size of pixel neighborhood
+      const weightedC = 5;  // Weighted constant subtracted from mean
       cv.adaptiveThreshold(
         gray,
         binary,
         255,
         cv.ADAPTIVE_THRESH_GAUSSIAN_C,
         cv.THRESH_BINARY_INV,
-        11,
-        2
+        blockSize,
+        weightedC
       );
 
       // Debug: Display Binary Image
