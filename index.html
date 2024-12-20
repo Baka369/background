@@ -28,13 +28,6 @@
       font-size: 20px;
       margin-top: 10px;
     }
-    .focus-overlay {
-      position: absolute;
-      border: 2px solid red;
-      width: 100px;
-      height: 100px;
-      display: none;
-    }
   </style>
 </head>
 <body>
@@ -44,28 +37,22 @@
   <input type="file" id="imageUpload" accept="image/*" style="display:none;">
   <button id="uploadBtn">Upload Image</button>
   <button id="cameraBtn">Click Picture</button>
-  <button id="focusBtn" style="display:none;">Focus Camera</button> <!-- Focus button -->
 
   <!-- Video and Canvas Elements -->
   <video id="video" autoplay playsinline style="display:none;"></video>
   <canvas id="canvas" width="640" height="480"></canvas>
   <button id="captureBtn" style="display:none;">Capture</button>
   <p id="result">Dots Counted: 0</p>
-  
-  <!-- Focus overlay -->
-  <div id="focusOverlay" class="focus-overlay"></div>
 
   <script>
     const uploadBtn = document.getElementById("uploadBtn");
     const cameraBtn = document.getElementById("cameraBtn");
-    const focusBtn = document.getElementById("focusBtn");
     const imageUpload = document.getElementById("imageUpload");
     const video = document.getElementById("video");
     const canvas = document.getElementById("canvas");
     const captureBtn = document.getElementById("captureBtn");
     const ctx = canvas.getContext("2d");
     const resultText = document.getElementById("result");
-    const focusOverlay = document.getElementById("focusOverlay");
 
     // Event: Upload Image
     uploadBtn.addEventListener("click", () => imageUpload.click());
@@ -87,23 +74,20 @@
       }
     });
 
-    // Event: Open Back Camera with Autofocus
+    // Event: Open Camera with Better Resolution
     cameraBtn.addEventListener("click", () => {
-      // Enumerate devices to get any available video device
+      // Enumerate devices to get the best camera (back camera)
       navigator.mediaDevices.enumerateDevices()
         .then(devices => {
           const videoDevices = devices.filter(device => device.kind === 'videoinput');
-          
           if (videoDevices.length > 0) {
+            // Try to access the camera with the highest resolution
             const constraints = {
               video: {
-                deviceId: { exact: videoDevices[0].deviceId }, // Use the first available camera
+                deviceId: { exact: videoDevices[0].deviceId },  // Using the first available camera (can change if multiple cameras)
                 width: { ideal: 1280 },
                 height: { ideal: 720 },
-                frameRate: { ideal: 30, max: 60 },
-                advanced: [{
-                  focusMode: "continuous", // Autofocus mode
-                }]
+                frameRate: { ideal: 30, max: 60 }
               }
             };
 
@@ -113,7 +97,6 @@
                 video.srcObject = stream;
                 video.style.display = "block";
                 captureBtn.style.display = "block";
-                focusBtn.style.display = "block"; // Show focus button
                 canvas.style.display = "none";
               })
               .catch((err) => {
@@ -121,7 +104,7 @@
                 alert("Error accessing the camera. Please check your device's camera permissions.");
               });
           } else {
-            alert("No video device found.");
+            alert("No video input devices found.");
           }
         })
         .catch((err) => {
@@ -130,42 +113,13 @@
         });
     });
 
-    // Event: Focus Camera (Manual)
-    focusBtn.addEventListener("click", () => {
-      const stream = video.srcObject;
-      const track = stream.getTracks()[0];
-      const capabilities = track.getCapabilities();
-
-      if (capabilities.focus) {
-        track.applyConstraints({ advanced: [{ focusMode: "continuous" }] })
-          .then(() => console.log("Camera focus applied"))
-          .catch(err => console.error("Focus error:", err));
-      }
-    });
-
     // Event: Capture Image from Camera
     captureBtn.addEventListener("click", () => {
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       processImage(); // Process the captured image
       video.style.display = "none";
       captureBtn.style.display = "none";
-      focusBtn.style.display = "none"; // Hide focus button
       canvas.style.display = "block";
-    });
-
-    // Event: Tap-to-Focus (Simulated)
-    video.addEventListener("click", function(event) {
-      const rect = video.getBoundingClientRect();
-      const x = (event.clientX - rect.left) / rect.width;
-      const y = (event.clientY - rect.top) / rect.height;
-
-      // Show focus overlay at clicked position
-      focusOverlay.style.left = `${x * 100}%`;
-      focusOverlay.style.top = `${y * 100}%`;
-      focusOverlay.style.display = "block";
-
-      // Simulate focusing (this would ideally trigger actual camera focus if possible)
-      console.log("Focus simulated at:", x, y);
     });
 
     // Process Image and Count Dots
