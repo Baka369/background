@@ -74,17 +74,30 @@
       }
     });
 
-    // Event: Open Camera
+    // Event: Open Camera with High Resolution
     cameraBtn.addEventListener("click", () => {
+      // Try getting the camera with higher resolution
+      const constraints = {
+        video: {
+          facingMode: "environment",
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          frameRate: { ideal: 30, max: 60 }
+        }
+      };
+
       navigator.mediaDevices
-        .getUserMedia({ video: { facingMode: "environment" } })
+        .getUserMedia(constraints)
         .then((stream) => {
           video.srcObject = stream;
           video.style.display = "block";
           captureBtn.style.display = "block";
           canvas.style.display = "none";
         })
-        .catch((err) => console.error("Camera access error:", err));
+        .catch((err) => {
+          console.error("Camera access error:", err);
+          alert("Error accessing the camera. Please check your device's camera permissions.");
+        });
     });
 
     // Event: Capture Image from Camera
