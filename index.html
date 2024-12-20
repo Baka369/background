@@ -1,146 +1,147 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Dot Counter</title>
-  <script async src="https://docs.opencv.org/4.5.2/opencv.js"></script>
-  <style>
-    body {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      margin: 0;
-      background-color: #f4f4f4;
-    }
-    canvas, video {
-      border: 1px solid black;
-      margin-top: 10px;
-    }
-    button, input {
-      margin: 10px;
-      padding: 10px 20px;
-      font-size: 16px;
-      cursor: pointer;
-    }
-    #result {
-      font-size: 20px;
-      margin-top: 10px;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Webcam Access with High Quality</title>
+    <style>
+        video {
+            width: 100%;
+            max-width: 1920px;
+            margin: 0 auto;
+            display: block;
+        }
+    </style>
 </head>
 <body>
-  <h1>Dot Counter</h1>
+    <video id="webcamVideo" autoplay playsinline></video>
 
-  <!-- Buttons and File Input -->
-  <input type="file" id="imageUpload" accept="image/*" style="display:none;">
-  <button id="uploadBtn">Upload Image</button>
-  <button id="cameraBtn">Click Picture</button>
-
-  <!-- Video and Canvas Elements -->
-  <video id="video" autoplay playsinline style="display:none;"></video>
-  <canvas id="canvas" width="640" height="480"></canvas>
-  <button id="captureBtn" style="display:none;">Capture</button>
-  <p id="result">Dots Counted: 0</p>
-
-  <script>
-    const uploadBtn = document.getElementById("uploadBtn");
-    const cameraBtn = document.getElementById("cameraBtn");
-    const imageUpload = document.getElementById("imageUpload");
-    const video = document.getElementById("video");
-    const canvas = document.getElementById("canvas");
-    const captureBtn = document.getElementById("captureBtn");
-    const ctx = canvas.getContext("2d");
-    const resultText = document.getElementById("result");
-
-    // Event: Upload Image
-    uploadBtn.addEventListener("click", () => imageUpload.click());
-
-    imageUpload.addEventListener("change", (event) => {
-      const file = event.target.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const img = new Image();
-          img.onload = () => {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            processImage();
-          };
-          img.src = e.target.result;
+    <script>
+        const webcamVideo = document.getElementById("webcamVideo");
+        const constraints = {
+            video: {
+                width: { ideal: 1920 },
+                height: { ideal: 1080 },
+                aspectRatio: { ideal: 1.7777777778 },
+                facingMode: "environment",
+                frameRate: { ideal: 60, min: 30 },
+                resizeMode: 'none',
+                brightness: { ideal: 100 },
+                contrast: { ideal: 95 },
+                saturation: { ideal: 100 },
+                sharpness: { ideal: 100 },
+                focusMode: "continuous",
+                whiteBalanceMode: "continuous",
+                exposureMode: "continuous",
+                exposureCompensation: { ideal: 0 },
+                zoom: { ideal: 1.0 },
+                colorTemperature: { ideal: 5500 },
+                iso: { ideal: 100 },
+                noiseReduction: { ideal: true },
+                backgroundBlur: { ideal: 0 },
+                powerLineFrequency: { ideal: 50 }
+            },
+            audio: false
         };
-        reader.readAsDataURL(file);
-      }
-    });
 
-    // Event: Open Camera
-    cameraBtn.addEventListener("click", () => {
-      navigator.mediaDevices
-        .getUserMedia({ video: { facingMode: "environment" } })
-        .then((stream) => {
-          video.srcObject = stream;
-          video.style.display = "block";
-          captureBtn.style.display = "block";
-          canvas.style.display = "none";
-        })
-        .catch((err) => console.error("Camera access error:", err));
-    });
+        async function initializeCamera() {
+            try {
+                // Request camera access with advanced constraints
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                
+                // Get video track for additional settings
+                const videoTrack = stream.getVideoTracks()[0];
+                
+                // Apply advanced settings if supported
+                const capabilities = videoTrack.getCapabilities();
+                const settings = videoTrack.getSettings();
+                
+                // Enable torch if available
+                if (capabilities.torch) {
+                    await videoTrack.applyConstraints({ advanced: [{ torch: true }] });
+                }
 
-    // Event: Capture Image from Camera
-    captureBtn.addEventListener("click", () => {
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      processImage(); // Process the captured image
-      video.style.display = "none";
-      captureBtn.style.display = "none";
-      canvas.style.display = "block";
-    });
+                // Set video source
+                webcamVideo.srcObject = stream;
+                
+                // Enable advanced image capture if supported
+                if ('imageCapture' in window) {
+                    const imageCapture = new ImageCapture(videoTrack);
+                    // Additional image capture settings can be added here
+                }
 
-    // Process Image and Count Dots
-    function processImage() {
-      const src = cv.imread(canvas);
+                console.log('Camera initialized with settings:', settings);
+                
+                // Apply additional advanced settings if available
+                if (videoTrack.getSettings) {
+                    const currentSettings = videoTrack.getSettings();
+                    console.log('Current camera settings:', currentSettings);
+                }
 
-      // Convert to Grayscale
-      const gray = new cv.Mat();
-      cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
+            } catch (error) {
+                console.error('Error accessing camera:', error);
+                // Handle specific error types
+                if (error.name === 'NotAllowedError') {
+                    alert('Camera access denied. Please enable camera permissions.');
+                } else if (error.name === 'NotFoundError') {
+                    alert('No camera found on this device.');
+                } else {
+                    alert('Error accessing camera: ' + error.message);
+                }
+            }
+        }
 
-      // Apply Gaussian Blur to Reduce Noise
-      cv.GaussianBlur(gray, gray, { width: 5, height: 5 }, 0);
+        // Initialize camera when page loads
+        window.addEventListener('load', initializeCamera);
 
-      // Apply Weighted Adaptive Thresholding
-      const binary = new cv.Mat();
-      const blockSize = 7; // Size of pixel neighborhood
-      const weightedC = 5;  // Weighted constant subtracted from mean
-      cv.adaptiveThreshold(
-        gray,
-        binary,
-        255,
-        cv.ADAPTIVE_THRESH_GAUSSIAN_C,
-        cv.THRESH_BINARY_INV,
-        blockSize,
-        weightedC
-      );
+        // Handle visibility changes
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                initializeCamera();
+            }
+        });
 
-      // Debug: Display Binary Image
-      cv.imshow(canvas, binary);
+        // Optional: Add event listener for orientation changes
+        window.addEventListener('orientationchange', () => {
+            setTimeout(initializeCamera, 200); // Reinitialize camera after orientation change
+        });
 
-      // Find Contours
-      const contours = new cv.MatVector();
-      const hierarchy = new cv.Mat();
-      cv.findContours(binary, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+        // Optional: Handle window resize
+        let resizeTimeout;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(() => {
+                initializeCamera();
+            }, 200);
+        });
 
-      // Count and Display Dots
-      const dotCount = contours.size();
-      console.log("Contours detected:", dotCount);
-      resultText.innerText = `Dots Counted: ${dotCount}`;
+        // Optional: Add function to take high-quality snapshot
+        async function takeHighQualitySnapshot() {
+            try {
+                const videoTrack = webcamVideo.srcObject.getVideoTracks()[0];
+                const imageCapture = new ImageCapture(videoTrack);
+                const photoSettings = {
+                    imageHeight: 1920,
+                    imageWidth: 1080,
+                    redEyeReduction: true,
+                    fillLightMode: "auto"
+                };
+                const photo = await imageCapture.takePhoto(photoSettings);
+                return photo;
+            } catch (error) {
+                console.error('Error taking photo:', error);
+                return null;
+            }
+        }
 
-      // Clean up
-      src.delete();
-      gray.delete();
-      binary.delete();
-      contours.delete();
-      hierarchy.delete();
-    }
-  </script>
+        // Optional: Error recovery function
+        function handleCameraError() {
+            setTimeout(() => {
+                initializeCamera().catch(error => {
+                    console.error('Camera recovery failed:', error);
+                });
+            }, 1000);
+        }
+    </script>
 </body>
 </html>
