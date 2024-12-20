@@ -74,29 +74,42 @@
       }
     });
 
-    // Event: Open Camera with High Resolution
+    // Event: Open Camera with Better Resolution
     cameraBtn.addEventListener("click", () => {
-      // Try getting the camera with higher resolution
-      const constraints = {
-        video: {
-          facingMode: "environment",
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-          frameRate: { ideal: 30, max: 60 }
-        }
-      };
+      // Enumerate devices to get the best camera (back camera)
+      navigator.mediaDevices.enumerateDevices()
+        .then(devices => {
+          const videoDevices = devices.filter(device => device.kind === 'videoinput');
+          if (videoDevices.length > 0) {
+            // Try to access the camera with the highest resolution
+            const constraints = {
+              video: {
+                deviceId: { exact: videoDevices[0].deviceId },  // Using the first available camera (can change if multiple cameras)
+                width: { ideal: 1280 },
+                height: { ideal: 720 },
+                frameRate: { ideal: 30, max: 60 }
+              }
+            };
 
-      navigator.mediaDevices
-        .getUserMedia(constraints)
-        .then((stream) => {
-          video.srcObject = stream;
-          video.style.display = "block";
-          captureBtn.style.display = "block";
-          canvas.style.display = "none";
+            navigator.mediaDevices
+              .getUserMedia(constraints)
+              .then((stream) => {
+                video.srcObject = stream;
+                video.style.display = "block";
+                captureBtn.style.display = "block";
+                canvas.style.display = "none";
+              })
+              .catch((err) => {
+                console.error("Camera access error:", err);
+                alert("Error accessing the camera. Please check your device's camera permissions.");
+              });
+          } else {
+            alert("No video input devices found.");
+          }
         })
         .catch((err) => {
-          console.error("Camera access error:", err);
-          alert("Error accessing the camera. Please check your device's camera permissions.");
+          console.error("Error enumerating devices:", err);
+          alert("Error accessing devices.");
         });
     });
 
@@ -122,7 +135,7 @@
 
       // Apply Weighted Adaptive Thresholding
       const binary = new cv.Mat();
-      const blockSize = 7; // Size of pixel neighborhood
+      const blockSize = 17; // Size of pixel neighborhood
       const weightedC = 5;  // Weighted constant subtracted from mean
       cv.adaptiveThreshold(
         gray,
