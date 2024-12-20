@@ -89,14 +89,15 @@
 
     // Event: Open Back Camera with Autofocus
     cameraBtn.addEventListener("click", () => {
-      // Enumerate devices to get the back camera
+      // Enumerate devices to get any available video device
       navigator.mediaDevices.enumerateDevices()
         .then(devices => {
-          const videoDevices = devices.filter(device => device.kind === 'videoinput' && device.label.indexOf("back") !== -1);
+          const videoDevices = devices.filter(device => device.kind === 'videoinput');
+          
           if (videoDevices.length > 0) {
             const constraints = {
               video: {
-                deviceId: { exact: videoDevices[0].deviceId },
+                deviceId: { exact: videoDevices[0].deviceId }, // Use the first available camera
                 width: { ideal: 1280 },
                 height: { ideal: 720 },
                 frameRate: { ideal: 30, max: 60 },
@@ -120,7 +121,7 @@
                 alert("Error accessing the camera. Please check your device's camera permissions.");
               });
           } else {
-            alert("No back camera found.");
+            alert("No video device found.");
           }
         })
         .catch((err) => {
