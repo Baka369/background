@@ -28,6 +28,13 @@
       font-size: 20px;
       margin-top: 10px;
     }
+    .focus-overlay {
+      position: absolute;
+      border: 2px solid red;
+      width: 100px;
+      height: 100px;
+      display: none;
+    }
   </style>
 </head>
 <body>
@@ -44,6 +51,9 @@
   <canvas id="canvas" width="640" height="480"></canvas>
   <button id="captureBtn" style="display:none;">Capture</button>
   <p id="result">Dots Counted: 0</p>
+  
+  <!-- Focus overlay -->
+  <div id="focusOverlay" class="focus-overlay"></div>
 
   <script>
     const uploadBtn = document.getElementById("uploadBtn");
@@ -55,6 +65,7 @@
     const captureBtn = document.getElementById("captureBtn");
     const ctx = canvas.getContext("2d");
     const resultText = document.getElementById("result");
+    const focusOverlay = document.getElementById("focusOverlay");
 
     // Event: Upload Image
     uploadBtn.addEventListener("click", () => imageUpload.click());
@@ -139,6 +150,21 @@
       captureBtn.style.display = "none";
       focusBtn.style.display = "none"; // Hide focus button
       canvas.style.display = "block";
+    });
+
+    // Event: Tap-to-Focus (Simulated)
+    video.addEventListener("click", function(event) {
+      const rect = video.getBoundingClientRect();
+      const x = (event.clientX - rect.left) / rect.width;
+      const y = (event.clientY - rect.top) / rect.height;
+
+      // Show focus overlay at clicked position
+      focusOverlay.style.left = `${x * 100}%`;
+      focusOverlay.style.top = `${y * 100}%`;
+      focusOverlay.style.display = "block";
+
+      // Simulate focusing (this would ideally trigger actual camera focus if possible)
+      console.log("Focus simulated at:", x, y);
     });
 
     // Process Image and Count Dots
