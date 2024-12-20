@@ -74,20 +74,23 @@
       }
     });
 
-    // Event: Open Camera with Better Resolution
+    // Event: Open Camera with Autofocus
     cameraBtn.addEventListener("click", () => {
       // Enumerate devices to get the best camera (back camera)
       navigator.mediaDevices.enumerateDevices()
         .then(devices => {
           const videoDevices = devices.filter(device => device.kind === 'videoinput');
           if (videoDevices.length > 0) {
-            // Try to access the camera with the highest resolution
+            // Try to access the camera with autofocus enabled
             const constraints = {
               video: {
-                deviceId: { exact: videoDevices[0].deviceId },  // Using the first available camera (can change if multiple cameras)
+                deviceId: { exact: videoDevices[0].deviceId },
                 width: { ideal: 1280 },
                 height: { ideal: 720 },
-                frameRate: { ideal: 30, max: 60 }
+                frameRate: { ideal: 30, max: 60 },
+                advanced: [{
+                  focusMode: "continuous", // Request autofocus mode
+                }]
               }
             };
 
@@ -135,7 +138,7 @@
 
       // Apply Weighted Adaptive Thresholding
       const binary = new cv.Mat();
-      const blockSize = 7; // Size of pixel neighborhood
+      const blockSize = 9; // Size of pixel neighborhood
       const weightedC = 5;  // Weighted constant subtracted from mean
       cv.adaptiveThreshold(
         gray,
