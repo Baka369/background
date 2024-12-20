@@ -37,6 +37,7 @@
   <input type="file" id="imageUpload" accept="image/*" style="display:none;">
   <button id="uploadBtn">Upload Image</button>
   <button id="cameraBtn">Click Picture</button>
+  <button id="focusBtn" style="display:none;">Focus Camera</button> <!-- Focus button -->
 
   <!-- Video and Canvas Elements -->
   <video id="video" autoplay playsinline style="display:none;"></video>
@@ -47,6 +48,7 @@
   <script>
     const uploadBtn = document.getElementById("uploadBtn");
     const cameraBtn = document.getElementById("cameraBtn");
+    const focusBtn = document.getElementById("focusBtn");
     const imageUpload = document.getElementById("imageUpload");
     const video = document.getElementById("video");
     const canvas = document.getElementById("canvas");
@@ -74,14 +76,13 @@
       }
     });
 
-    // Event: Open Camera with Autofocus
+    // Event: Open Back Camera with Autofocus
     cameraBtn.addEventListener("click", () => {
-      // Enumerate devices to get the best camera (back camera)
+      // Enumerate devices to get the back camera
       navigator.mediaDevices.enumerateDevices()
         .then(devices => {
-          const videoDevices = devices.filter(device => device.kind === 'videoinput');
+          const videoDevices = devices.filter(device => device.kind === 'videoinput' && device.label.indexOf("back") !== -1);
           if (videoDevices.length > 0) {
-            // Try to access the camera with autofocus enabled
             const constraints = {
               video: {
                 deviceId: { exact: videoDevices[0].deviceId },
@@ -89,7 +90,7 @@
                 height: { ideal: 720 },
                 frameRate: { ideal: 30, max: 60 },
                 advanced: [{
-                  focusMode: "continuous", // Request autofocus mode
+                  focusMode: "continuous", // Autofocus mode
                 }]
               }
             };
@@ -100,6 +101,7 @@
                 video.srcObject = stream;
                 video.style.display = "block";
                 captureBtn.style.display = "block";
+                focusBtn.style.display = "block"; // Show focus button
                 canvas.style.display = "none";
               })
               .catch((err) => {
@@ -107,7 +109,7 @@
                 alert("Error accessing the camera. Please check your device's camera permissions.");
               });
           } else {
-            alert("No video input devices found.");
+            alert("No back camera found.");
           }
         })
         .catch((err) => {
@@ -116,12 +118,26 @@
         });
     });
 
+    // Event: Focus Camera (Manual)
+    focusBtn.addEventListener("click", () => {
+      const stream = video.srcObject;
+      const track = stream.getTracks()[0];
+      const capabilities = track.getCapabilities();
+
+      if (capabilities.focus) {
+        track.applyConstraints({ advanced: [{ focusMode: "continuous" }] })
+          .then(() => console.log("Camera focus applied"))
+          .catch(err => console.error("Focus error:", err));
+      }
+    });
+
     // Event: Capture Image from Camera
     captureBtn.addEventListener("click", () => {
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       processImage(); // Process the captured image
       video.style.display = "none";
       captureBtn.style.display = "none";
+      focusBtn.style.display = "none"; // Hide focus button
       canvas.style.display = "block";
     });
 
