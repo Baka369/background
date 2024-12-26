@@ -37,6 +37,7 @@
   <input type="file" id="imageUpload" accept="image/*" style="display:none;">
   <button id="uploadBtn">Upload Image</button>
   <button id="cameraBtn">Click Picture</button>
+  <button id="flashlightBtn" style="display:none;">Toggle Flashlight</button>
 
   <!-- Video and Canvas Elements -->
   <video id="video" autoplay playsinline style="display:none;"></video>
@@ -47,12 +48,17 @@
   <script>
     const uploadBtn = document.getElementById("uploadBtn");
     const cameraBtn = document.getElementById("cameraBtn");
+    const flashlightBtn = document.getElementById("flashlightBtn");
     const imageUpload = document.getElementById("imageUpload");
     const video = document.getElementById("video");
     const canvas = document.getElementById("canvas");
     const captureBtn = document.getElementById("captureBtn");
     const ctx = canvas.getContext("2d");
     const resultText = document.getElementById("result");
+
+    let stream = null;
+    let track = null;
+    let flashlightOn = false;
 
     // Event: Upload Image
     uploadBtn.addEventListener("click", () => imageUpload.click());
@@ -78,10 +84,13 @@
     cameraBtn.addEventListener("click", () => {
       navigator.mediaDevices
         .getUserMedia({ video: { facingMode: "environment" } })
-        .then((stream) => {
+        .then((mediaStream) => {
+          stream = mediaStream;
+          track = stream.getVideoTracks()[0];
           video.srcObject = stream;
           video.style.display = "block";
           captureBtn.style.display = "block";
+          flashlightBtn.style.display = "block";
           canvas.style.display = "none";
         })
         .catch((err) => console.error("Camera access error:", err));
@@ -93,7 +102,25 @@
       processImage(); // Process the captured image
       video.style.display = "none";
       captureBtn.style.display = "none";
+      flashlightBtn.style.display = "none";
       canvas.style.display = "block";
+    });
+
+    // Event: Toggle Flashlight
+    flashlightBtn.addEventListener("click", () => {
+      if (track) {
+        const capabilities = track.getCapabilities();
+        if (capabilities.torch) {
+          flashlightOn = !flashlightOn;
+          track.applyConstraints({
+            advanced: [{ torch: flashlightOn }],
+          }).catch((err) => console.error("Flashlight toggle error:", err));
+        } else {
+          alert("Flashlight is not supported on this device.");
+        }
+      } else {
+        alert("No camera access to control flashlight.");
+      }
     });
 
     // Process Image and Count Dots
