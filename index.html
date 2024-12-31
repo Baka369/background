@@ -24,15 +24,18 @@
       font-size: 16px;
       cursor: pointer;
     }
-    #result {
-      font-size: 20px;
-      margin-top: 10px;
-    }
     #controls {
       display: flex;
       flex-direction: column;
       align-items: center;
+    }
+    #result {
+      font-size: 20px;
       margin-top: 10px;
+    }
+    #zoomInfo {
+      margin-top: 5px;
+      font-size: 16px;
     }
   </style>
 </head>
@@ -42,17 +45,18 @@
   <!-- Buttons and File Input -->
   <input type="file" id="imageUpload" accept="image/*" style="display:none;">
   <button id="uploadBtn">Upload Image</button>
-  <button id="cameraBtn">Open Camera</button>
+  <button id="cameraBtn">Click Picture</button>
 
   <!-- Video and Canvas Elements -->
   <video id="video" autoplay playsinline style="display:none;"></video>
   <canvas id="canvas" width="640" height="480"></canvas>
+  <button id="captureBtn" style="display:none;">Capture</button>
 
-  <!-- Capture and Zoom Controls -->
+  <!-- Zoom Controls -->
   <div id="controls">
-    <button id="captureBtn" style="display:none;">Capture</button>
     <label for="zoomSlider">Zoom:</label>
-    <input id="zoomSlider" type="range" min="1" max="3" step="0.1" value="1" style="display:none;">
+    <input id="zoomSlider" type="range" min="1" max="3" step="0.1" value="1">
+    <div id="zoomInfo">Zoom Level: 1.0</div> <!-- Text to show the current zoom level -->
   </div>
 
   <p id="result">Dots Counted: 0</p>
@@ -64,9 +68,10 @@
     const video = document.getElementById("video");
     const canvas = document.getElementById("canvas");
     const captureBtn = document.getElementById("captureBtn");
-    const zoomSlider = document.getElementById("zoomSlider");
     const ctx = canvas.getContext("2d");
     const resultText = document.getElementById("result");
+    const zoomSlider = document.getElementById("zoomSlider");
+    const zoomInfo = document.getElementById("zoomInfo");
 
     let track; // To store the video track for zoom control
 
@@ -96,28 +101,10 @@
         .getUserMedia({ video: { facingMode: "environment" } })
         .then((stream) => {
           video.srcObject = stream;
+          track = stream.getVideoTracks()[0]; // Store the video track for zoom control
           video.style.display = "block";
           captureBtn.style.display = "block";
-          zoomSlider.style.display = "block";
           canvas.style.display = "none";
-          track = stream.getVideoTracks()[0];
-
-          // Enable Zoom Functionality
-          const capabilities = track.getCapabilities();
-          if (capabilities.zoom) {
-            zoomSlider.min = capabilities.zoom.min || 1;
-            zoomSlider.max = capabilities.zoom.max || 3;
-            zoomSlider.step = capabilities.zoom.step || 0.1;
-            zoomSlider.value = capabilities.zoom.min || 1;
-
-            zoomSlider.addEventListener("input", () => {
-              track.applyConstraints({
-                advanced: [{ zoom: parseFloat(zoomSlider.value) }]
-              }).catch((err) => console.error("Zoom error:", err));
-            });
-          } else {
-            console.warn("Zoom not supported on this device.");
-          }
         })
         .catch((err) => console.error("Camera access error:", err));
     });
@@ -125,11 +112,21 @@
     // Event: Capture Image from Camera
     captureBtn.addEventListener("click", () => {
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      processImage();
+      processImage(); // Process the captured image
       video.style.display = "none";
       captureBtn.style.display = "none";
-      zoomSlider.style.display = "none";
       canvas.style.display = "block";
+    });
+
+    // Zoom functionality
+    zoomSlider.addEventListener("input", () => {
+      const zoomLevel = zoomSlider.value;
+      track.applyConstraints({
+        advanced: [{ zoom: parseFloat(zoomLevel) }]
+      }).catch((err) => console.error("Zoom error:", err));
+
+      // Update zoom info text
+      zoomInfo.innerText = `Zoom Level: ${zoomLevel}`;
     });
 
     // Process Image and Count Dots
@@ -145,7 +142,7 @@
 
       // Apply Weighted Adaptive Thresholding
       const binary = new cv.Mat();
-      const blockSize = 7; // Size of pixel neighborhood
+      const blockSize = 9; // Size of pixel neighborhood
       const weightedC = 7;  // Weighted constant subtracted from mean
       cv.adaptiveThreshold(
         gray,
@@ -167,7 +164,6 @@
 
       // Count and Display Dots
       const dotCount = contours.size();
-      console.log("Contours detected:", dotCount);
       resultText.innerText = `Dots Counted: ${dotCount}`;
 
       // Clean up
