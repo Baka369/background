@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Dot Counter</title>
+  <title>Dot Counter with Zoom</title>
   <script async src="https://docs.opencv.org/4.5.2/opencv.js"></script>
   <style>
     body {
@@ -18,11 +18,16 @@
       border: 1px solid black;
       margin-top: 10px;
     }
-    button, input {
+    button, input, label {
       margin: 10px;
       padding: 10px 20px;
       font-size: 16px;
       cursor: pointer;
+    }
+    #controls {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
     }
     #result {
       font-size: 20px;
@@ -31,96 +36,63 @@
   </style>
 </head>
 <body>
-  <h1>Dot Counter</h1>
-
-  <!-- Buttons and File Input -->
-  <input type="file" id="imageUpload" accept="image/*" style="display:none;">
-  <button id="uploadBtn">Upload Image</button>
-  <button id="cameraBtn">Click Picture</button>
-  <button id="flashlightBtn" style="display:none;">Toggle Flashlight</button>
+  <h1>Dot Counter with Zoom</h1>
 
   <!-- Video and Canvas Elements -->
-  <video id="video" autoplay playsinline style="display:none;"></video>
-  <canvas id="canvas" width="640" height="480"></canvas>
-  <button id="captureBtn" style="display:none;">Capture</button>
+  <video id="video" autoplay playsinline width="640" height="480"></video>
+  <canvas id="canvas" width="640" height="480" style="display: none;"></canvas>
+
+  <!-- Controls Section -->
+  <div id="controls">
+    <label for="zoomSlider">Zoom:</label>
+    <input id="zoomSlider" type="range" min="1" max="3" step="0.1" value="1">
+    <button id="captureBtn">Capture</button>
+  </div>
+
   <p id="result">Dots Counted: 0</p>
 
   <script>
-    const uploadBtn = document.getElementById("uploadBtn");
-    const cameraBtn = document.getElementById("cameraBtn");
-    const flashlightBtn = document.getElementById("flashlightBtn");
-    const imageUpload = document.getElementById("imageUpload");
     const video = document.getElementById("video");
     const canvas = document.getElementById("canvas");
-    const captureBtn = document.getElementById("captureBtn");
     const ctx = canvas.getContext("2d");
     const resultText = document.getElementById("result");
+    const zoomSlider = document.getElementById("zoomSlider");
+    const captureBtn = document.getElementById("captureBtn");
 
-    let stream = null;
-    let track = null;
-    let flashlightOn = false;
+    let track; // To store the video track for zoom control
 
-    // Event: Upload Image
-    uploadBtn.addEventListener("click", () => imageUpload.click());
+    // Access Camera and Set Up Video Stream
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+      .then((stream) => {
+        video.srcObject = stream;
+        track = stream.getVideoTracks()[0];
 
-    imageUpload.addEventListener("change", (event) => {
-      const file = event.target.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const img = new Image();
-          img.onload = () => {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            processImage();
-          };
-          img.src = e.target.result;
-        };
-        reader.readAsDataURL(file);
-      }
-    });
+        // Check for Zoom Capability
+        const capabilities = track.getCapabilities();
+        if (capabilities.zoom) {
+          zoomSlider.min = capabilities.zoom.min || 1;
+          zoomSlider.max = capabilities.zoom.max || 3;
+          zoomSlider.step = capabilities.zoom.step || 0.1;
+          zoomSlider.value = capabilities.zoom.min || 1;
 
-    // Event: Open Camera
-    cameraBtn.addEventListener("click", () => {
-      navigator.mediaDevices
-        .getUserMedia({ video: { facingMode: "environment" } })
-        .then((mediaStream) => {
-          stream = mediaStream;
-          track = stream.getVideoTracks()[0];
-          video.srcObject = stream;
-          video.style.display = "block";
-          captureBtn.style.display = "block";
-          flashlightBtn.style.display = "block";
-          canvas.style.display = "none";
-        })
-        .catch((err) => console.error("Camera access error:", err));
-    });
+          // Enable Zoom Functionality
+          zoomSlider.addEventListener("input", () => {
+            track.applyConstraints({
+              advanced: [{ zoom: parseFloat(zoomSlider.value) }]
+            }).catch((err) => console.error("Zoom error:", err));
+          });
+        } else {
+          console.warn("Zoom not supported on this device.");
+        }
+      })
+      .catch((err) => console.error("Camera access error:", err));
 
-    // Event: Capture Image from Camera
+    // Capture Button Event
     captureBtn.addEventListener("click", () => {
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      processImage(); // Process the captured image
+      processImage();
       video.style.display = "none";
-      captureBtn.style.display = "none";
-      flashlightBtn.style.display = "none";
       canvas.style.display = "block";
-    });
-
-    // Event: Toggle Flashlight
-    flashlightBtn.addEventListener("click", () => {
-      if (track) {
-        const capabilities = track.getCapabilities();
-        if (capabilities.torch) {
-          flashlightOn = !flashlightOn;
-          track.applyConstraints({
-            advanced: [{ torch: flashlightOn }],
-          }).catch((err) => console.error("Flashlight toggle error:", err));
-        } else {
-          alert("Flashlight is not supported on this device.");
-        }
-      } else {
-        alert("No camera access to control flashlight.");
-      }
     });
 
     // Process Image and Count Dots
@@ -136,7 +108,7 @@
 
       // Apply Weighted Adaptive Thresholding
       const binary = new cv.Mat();
-      const blockSize = 7; // Size of pixel neighborhood
+      const blockSize = 15; // Size of pixel neighborhood
       const weightedC = 5;  // Weighted constant subtracted from mean
       cv.adaptiveThreshold(
         gray,
@@ -158,7 +130,6 @@
 
       // Count and Display Dots
       const dotCount = contours.size();
-      console.log("Contours detected:", dotCount);
       resultText.innerText = `Dots Counted: ${dotCount}`;
 
       // Clean up
