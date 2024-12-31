@@ -46,7 +46,9 @@
   <div id="controls">
     <label for="zoomSlider">Zoom:</label>
     <input id="zoomSlider" type="range" min="1" max="3" step="0.1" value="1">
-    <button id="captureBtn">Capture</button>
+    <button id="captureBtn">Click</button>
+    <input type="file" id="imageUpload" accept="image/*" style="display:none;">
+    <button id="uploadBtn">Upload</button>
   </div>
 
   <p id="result">Dots Counted: 0</p>
@@ -58,6 +60,8 @@
     const resultText = document.getElementById("result");
     const zoomSlider = document.getElementById("zoomSlider");
     const captureBtn = document.getElementById("captureBtn");
+    const uploadBtn = document.getElementById("uploadBtn");
+    const imageUpload = document.getElementById("imageUpload");
 
     let track; // To store the video track for zoom control
 
@@ -87,12 +91,31 @@
       })
       .catch((err) => console.error("Camera access error:", err));
 
-    // Capture Button Event
+    // "Click" Button Event
     captureBtn.addEventListener("click", () => {
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      processImage();
-      video.style.display = "none";
       canvas.style.display = "block";
+      processImage(); // Process the captured image
+    });
+
+    // "Upload" Button Event
+    uploadBtn.addEventListener("click", () => imageUpload.click());
+
+    imageUpload.addEventListener("change", (event) => {
+      const file = event.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onload = () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            processImage();
+          };
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
     });
 
     // Process Image and Count Dots
@@ -109,7 +132,7 @@
       // Apply Weighted Adaptive Thresholding
       const binary = new cv.Mat();
       const blockSize = 9; // Size of pixel neighborhood
-      const weightedC = 5;  // Weighted constant subtracted from mean
+      const weightedC = 7;  // Weighted constant subtracted from mean
       cv.adaptiveThreshold(
         gray,
         binary,
