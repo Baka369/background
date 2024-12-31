@@ -24,42 +24,35 @@
       font-size: 16px;
       cursor: pointer;
     }
-    #controls {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
     #result {
       font-size: 20px;
       margin-top: 10px;
     }
-    #top-controls {
+    #controls {
       display: flex;
-      justify-content: center;
-      gap: 10px;
-      margin-bottom: 10px;
+      flex-direction: column;
+      align-items: center;
+      margin-top: 10px;
     }
   </style>
 </head>
 <body>
   <h1>Dot Counter with Zoom</h1>
 
-  <!-- Top Controls Section -->
-  <div id="top-controls">
-    <button id="uploadBtn">Upload Image</button>
-    <button id="cameraBtn">Open Camera</button>
-    <input type="file" id="imageUpload" accept="image/*" style="display:none;">
-  </div>
+  <!-- Buttons and File Input -->
+  <input type="file" id="imageUpload" accept="image/*" style="display:none;">
+  <button id="uploadBtn">Upload Image</button>
+  <button id="cameraBtn">Open Camera</button>
 
   <!-- Video and Canvas Elements -->
-  <video id="video" autoplay playsinline width="640" height="480" style="display: none;"></video>
-  <canvas id="canvas" width="640" height="480" style="display: none;"></canvas>
+  <video id="video" autoplay playsinline style="display:none;"></video>
+  <canvas id="canvas" width="640" height="480"></canvas>
 
-  <!-- Bottom Controls Section -->
+  <!-- Capture and Zoom Controls -->
   <div id="controls">
-    <button id="captureBtn" style="display: none;">Capture</button>
-    <label for="zoomSlider" style="display: none;">Zoom:</label>
-    <input id="zoomSlider" type="range" min="1" max="3" step="0.1" value="1" style="display: none;">
+    <button id="captureBtn" style="display:none;">Capture</button>
+    <label for="zoomSlider">Zoom:</label>
+    <input id="zoomSlider" type="range" min="1" max="3" step="0.1" value="1" style="display:none;">
   </div>
 
   <p id="result">Dots Counted: 0</p>
@@ -72,11 +65,12 @@
     const canvas = document.getElementById("canvas");
     const captureBtn = document.getElementById("captureBtn");
     const zoomSlider = document.getElementById("zoomSlider");
+    const ctx = canvas.getContext("2d");
     const resultText = document.getElementById("result");
 
     let track; // To store the video track for zoom control
 
-    // "Upload" Button Event
+    // Event: Upload Image
     uploadBtn.addEventListener("click", () => imageUpload.click());
 
     imageUpload.addEventListener("change", (event) => {
@@ -86,8 +80,6 @@
         reader.onload = (e) => {
           const img = new Image();
           img.onload = () => {
-            video.style.display = "none";
-            canvas.style.display = "block";
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
             processImage();
@@ -98,7 +90,7 @@
       }
     });
 
-    // "Open Camera" Button Event
+    // Event: Open Camera
     cameraBtn.addEventListener("click", () => {
       navigator.mediaDevices
         .getUserMedia({ video: { facingMode: "environment" } })
@@ -110,7 +102,7 @@
           canvas.style.display = "none";
           track = stream.getVideoTracks()[0];
 
-          // Check for Zoom Capability
+          // Enable Zoom Functionality
           const capabilities = track.getCapabilities();
           if (capabilities.zoom) {
             zoomSlider.min = capabilities.zoom.min || 1;
@@ -123,12 +115,14 @@
                 advanced: [{ zoom: parseFloat(zoomSlider.value) }]
               }).catch((err) => console.error("Zoom error:", err));
             });
+          } else {
+            console.warn("Zoom not supported on this device.");
           }
         })
         .catch((err) => console.error("Camera access error:", err));
     });
 
-    // "Capture" Button Event
+    // Event: Capture Image from Camera
     captureBtn.addEventListener("click", () => {
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       processImage();
@@ -139,7 +133,6 @@
     });
 
     // Process Image and Count Dots
-    const ctx = canvas.getContext("2d");
     function processImage() {
       const src = cv.imread(canvas);
 
@@ -174,6 +167,7 @@
 
       // Count and Display Dots
       const dotCount = contours.size();
+      console.log("Contours detected:", dotCount);
       resultText.innerText = `Dots Counted: ${dotCount}`;
 
       // Clean up
